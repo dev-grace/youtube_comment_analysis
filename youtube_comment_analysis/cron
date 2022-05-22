@@ -1,0 +1,7 @@
+from main.models import UserLog, DailyUserCount
+from datetime import datetime, timedelta
+
+def user_analysis():
+    date = datetime.today() - timedelta(days=1)
+    daily_count = UserLog.objects.filter(date__date = date).count()
+    DailyUserCount.objects.create(daily_user_count= daily_count, date= date)
