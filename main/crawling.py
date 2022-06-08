@@ -2,8 +2,6 @@ import pandas
 from googleapiclient.discovery import build
 import my_settings
 
-
-
 def crawling():
     api_key = my_settings.YOUTUBE_API_KEY
     video_info = list()

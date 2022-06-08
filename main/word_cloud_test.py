@@ -5,6 +5,7 @@ import numpy as np
 import tensorflow as tf
 import re
 from transformers import BertTokenizer, BertTokenizerFast, TFBertForSequenceClassification, BertForSequenceClassification
+
 # nltk.download('punkt')
 # nltk.download('averaged_perceptron_tagger')
 

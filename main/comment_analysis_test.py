@@ -3,22 +3,33 @@ import numpy as np
 import tensorflow as tf
 from transformers import BertTokenizer, BertTokenizerFast, TFBertForSequenceClassification, BertForSequenceClassification
 from keras.preprocessing.sequence import pad_sequences
+import multiprocessing
 
+# 모델 설정
+device = torch.device('cpu') # gpu -> core gpu server -> ec2 gpu
+model = BertForSequenceClassification.from_pretrained('./main/model')
+tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
+
+def analysis_func(sentence):
+    logits = test_sentences([sentence])
+    positive = int(np.argmax(logits))
+    return [sentence, positive]
+
+#     {'word_cloud: : {},
+# 'word_analysis':
+# 'key': {
+# 'positive': true, false, 
+# 'positive_count': 10, 
+# 'negetive_count': 20
+# 'positive_comment_list': []
+# 'negative_comment_list': []
+# }, 
+# }
 def commentAnalysisTest(sentence_list, word_dict): # 원본
 
-    #     {'word_cloud: : {},
-    # 'word_analysis':
-    # 'key': {
-    # 'positive': true, false, 
-    # 'positive_count': 10, 
-    # 'negetive_count': 20
-    # 'positive_comment_list': []
-    # 'negative_comment_list': []
-    # }, 
-    # }
-    device = torch.device('cpu') # gpu -> core gpu server -> ec2 gpu
-    model = BertForSequenceClassification.from_pretrained('./main/model')
-    tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
+    # 평가모드로 변경
+    global model
+    model.eval()
 
     word_analysis = {}
     set_word_list = list(word_dict.keys()) + ['etc']
@@ -31,10 +42,13 @@ def commentAnalysisTest(sentence_list, word_dict): # 원본
             'negative_comment_list':[]
             }
 
-    for sentence in sentence_list:
-        logits = test_sentences([sentence], model, tokenizer, device)
-        positive = int(np.argmax(logits))
+    # 멀티 프로세싱
+    pool = multiprocessing.Pool(processes= 2)
+    sentence_positive_list = list(pool.map(analysis_func, sentence_list))
+    pool.close()
+    pool.join()
 
+    for sentence, positive in sentence_positive_list:
         if any(keyword in sentence for keyword in word_dict.keys()): # 문장이 워드 클라우드에 포함되는 지 확인
             if positive == 1: # 댓글이 긍정-부정인지 확인
                 for word in word_dict.keys(): # 포함되는 키워드 확인
@@ -69,7 +83,8 @@ def commentAnalysisTest(sentence_list, word_dict): # 원본
     return result
 
 # 입력 데이터 변환
-def convert_input_data(sentences, tokenizer):
+def convert_input_data(sentences):
+    global tokenizer
 
     # BERT의 토크나이저로 문장을 토큰으로 분리
     tokenized_texts = [tokenizer.tokenize(sent) for sent in sentences]
@@ -99,12 +114,10 @@ def convert_input_data(sentences, tokenizer):
     return inputs, masks
 
 # 문장 테스트
-def test_sentences(sentences, model, tokenizer, device):
-    # 평가모드로 변경
-    model.eval()
-
+def test_sentences(sentences):
+    global model, device
     # 문장을 입력 데이터로 변환
-    inputs, masks = convert_input_data(sentences, tokenizer)
+    inputs, masks = convert_input_data(sentences)
 
     # 데이터를 GPU에 넣음
     b_input_ids = inputs.to(device)
