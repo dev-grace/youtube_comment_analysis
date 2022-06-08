@@ -4,7 +4,7 @@ import tensorflow as tf
 from transformers import BertTokenizer, BertTokenizerFast, TFBertForSequenceClassification, BertForSequenceClassification
 from keras.preprocessing.sequence import pad_sequences
 
-def commentAnalysisTest(comment_list, word_dict):
+def commentAnalysisTest(sentence_list, word_dict): # 원본
 
     #     {'word_cloud: : {},
     # 'word_analysis':
@@ -31,27 +31,28 @@ def commentAnalysisTest(comment_list, word_dict):
             'negative_comment_list':[]
             }
 
-    for comment in comment_list:
-        logits = test_sentences([comment['comment']], model, tokenizer, device)
+    for sentence in sentence_list:
+        logits = test_sentences([sentence], model, tokenizer, device)
         positive = int(np.argmax(logits))
-        if any(keyword in comment['comment'] for keyword in word_dict.keys()): # 문장이 워드 클라우드에 포함되는 지 확인
+
+        if any(keyword in sentence for keyword in word_dict.keys()): # 문장이 워드 클라우드에 포함되는 지 확인
             if positive == 1: # 댓글이 긍정-부정인지 확인
                 for word in word_dict.keys(): # 포함되는 키워드 확인
-                    if word in comment['comment']:
+                    if word in sentence:
                         word_analysis[word]['positive_count'] += 1
-                        word_analysis[word]['positive_comment_list'].append(comment['comment'])
+                        word_analysis[word]['positive_comment_list'].append(sentence)
             else:
                 for word in word_dict.keys():
-                    if word in comment['comment']:
+                    if word in sentence:
                         word_analysis[word]['negetive_count'] += 1
-                        word_analysis[word]['negative_comment_list'].append(comment['comment'])
+                        word_analysis[word]['negative_comment_list'].append(sentence)
         else: # 포함되지 않는 그룹은 ect로 분류
             if positive == 1:
                 word_analysis['etc']['positive_count'] += 1
-                word_analysis['etc']['positive_comment_list'].append(comment['comment'])
+                word_analysis['etc']['positive_comment_list'].append(sentence)
             else:
                 word_analysis['etc']['negetive_count'] += 1
-                word_analysis['etc']['negative_comment_list'].append(comment['comment'])
+                word_analysis['etc']['negative_comment_list'].append(sentence)
         
             
     for value in word_analysis.values():

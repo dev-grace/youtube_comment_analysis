@@ -5,11 +5,14 @@ from django.core.exceptions import ValidationError
 from main.comment_list import commentList, commentListTest
 from main.comment_analysis import commentAnalysis
 from main.comment_analysis_test import commentAnalysisTest
-from main.word_cloud import wordDict
+from main.word_cloud_test import wordDictTest
 from googleapiclient.errors import HttpError
+from django.http import HttpResponse
 from main.models import UserLog
 import json
+import csv
 import time
+from main.crawling import crawling
 from func import dataCheck, get_client_ip, get_video_url, ip_count
 
 
@@ -51,14 +54,18 @@ class YoutubeAnalysisTest(APIView): # 수정 테스트 API
             comment_list_time = time.time() - start_time
             print('댓글 리스트 수집: ', comment_list_time)
             start2_time = time.time() # 시간 측정
-            word_dict = wordDict(comment_list)
+            word_dict, sentence_list = wordDictTest(comment_list)
             word_dict_time = time.time() - start2_time
             print('워드 클라우드 생성: ', word_dict_time)
+            result = {}
             start3_time = time.time() # 시간 측정
-            result = commentAnalysisTest(comment_list, word_dict)
+            result = commentAnalysisTest(sentence_list, word_dict)
             result_time = time.time() - start3_time
             print('키워드 긍정-부정 분석: ', result_time)
-            result['time'] = [comment_list_time, word_dict_time, result_time]# 임시
+            result['time'] = {"댓글 수집": comment_list_time, "워드 클라우드": word_dict_time, "키워드 분석": result_time} # 임시
+            result['댓글 개수'] = len(comment_list)
+            result['문장 개수'] = len(sentence_list)
+            result['단어 개수'] = len(word_dict)
             return Response(result, status=200)
         except HttpError:   #유튜브 링크 에러
             return Response({'message': 'URL_ERROR'}, status=404)
@@ -68,6 +75,20 @@ class YoutubeAnalysisTest(APIView): # 수정 테스트 API
             return Response({'message': 'type wrong'}, status=403)
         except ValidationError:
             return Response({'message': 'VALIDATION_ERROR'}, status=404)
+
+class Crawling(APIView):
+    def get(self, request):
+        data = crawling()
+        response = HttpResponse(
+        content_type='text/csv',
+        headers={'Content-Disposition': 'attachment; filename="results.csv"'},
+        )
+        response.write(u'\ufeff'.encode('utf-8-sig'))
+        writer = csv.writer(response)
+        writer.writerow(['영상ID', '영상제목', '조회수', '좋아요수', '댓글수', '채널ID', '채널명', '댓글수/조회수(%)', '좋아요수/조회수(%)'])
+        writer.writerows(data)
+        
+        return response
 
 class Test(APIView):
     def post(self, request):
