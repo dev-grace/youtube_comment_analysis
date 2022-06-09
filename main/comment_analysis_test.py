@@ -25,14 +25,14 @@ def analysis_func(sentence):
 # 'negative_comment_list': []
 # }, 
 # }
-def commentAnalysisTest(sentence_list, word_dict): # 원본
+def commentAnalysisTest(word_dict, sentence_list): # 원본
 
     # 평가모드로 변경
     global model
     model.eval()
 
     word_analysis = {}
-    set_word_list = list(word_dict.keys()) + ['etc']
+    set_word_list = word_dict.keys()
     for word in set_word_list: # 초기화 작업
         word_analysis[word] = {
             'positive': 0, 
@@ -41,7 +41,7 @@ def commentAnalysisTest(sentence_list, word_dict): # 원본
             'positive_comment_list': [],
             'negative_comment_list':[]
             }
-
+            
     # 멀티 프로세싱
     pool = multiprocessing.Pool(processes= 2)
     sentence_positive_list = list(pool.map(analysis_func, sentence_list))
@@ -49,24 +49,16 @@ def commentAnalysisTest(sentence_list, word_dict): # 원본
     pool.join()
 
     for sentence, positive in sentence_positive_list:
-        if any(keyword in sentence for keyword in word_dict.keys()): # 문장이 워드 클라우드에 포함되는 지 확인
-            if positive == 1: # 댓글이 긍정-부정인지 확인
-                for word in word_dict.keys(): # 포함되는 키워드 확인
-                    if word in sentence:
-                        word_analysis[word]['positive_count'] += 1
-                        word_analysis[word]['positive_comment_list'].append(sentence)
-            else:
-                for word in word_dict.keys():
-                    if word in sentence:
-                        word_analysis[word]['negetive_count'] += 1
-                        word_analysis[word]['negative_comment_list'].append(sentence)
-        else: # 포함되지 않는 그룹은 ect로 분류
-            if positive == 1:
-                word_analysis['etc']['positive_count'] += 1
-                word_analysis['etc']['positive_comment_list'].append(sentence)
-            else:
-                word_analysis['etc']['negetive_count'] += 1
-                word_analysis['etc']['negative_comment_list'].append(sentence)
+        if positive == 1: # 댓글이 긍정-부정인지 확인
+            for word in word_dict.keys(): # 포함되는 키워드 확인
+                if word in sentence:
+                    word_analysis[word]['positive_count'] += 1
+                    word_analysis[word]['positive_comment_list'].append(sentence)
+        else:
+            for word in word_dict.keys():
+                if word in sentence:
+                    word_analysis[word]['negetive_count'] += 1
+                    word_analysis[word]['negative_comment_list'].append(sentence)
         
             
     for value in word_analysis.values():
