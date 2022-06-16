@@ -18,5 +18,6 @@ from django.urls import path, include
 
 urlpatterns = [
     path('youtube_admin/', admin.site.urls),
-    path('api/v1/', include('main.urls'))
+    path('api/v1/', include('main.urls')),
+    path('api/v1/youtube_channel/', include('channel.urls'))
 ]

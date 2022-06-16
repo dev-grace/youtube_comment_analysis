@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django_crontab',
     'konlpy',
     'main',
+    'channel'
 ]
 
 MIDDLEWARE = [
