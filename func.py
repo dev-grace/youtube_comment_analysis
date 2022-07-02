@@ -32,4 +32,4 @@ def ip_count(ip):
         user_ip.count = ip_count + 1
         user_ip.save()
     else:
-        IpCount.objects.create(ip = ip)
+        IpCount.objects.create(ip=ip)

@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 
 from pathlib import Path
+import my_settings
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -38,9 +39,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_crontab',
+    'drf_yasg',
+    'rest_framework',
     'konlpy',
     'main',
-    'channel'
+    'channel',
+    'analysis'
 ]
 
 MIDDLEWARE = [
@@ -77,17 +81,7 @@ WSGI_APPLICATION = 'youtube_comment_analysis.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'OPTIONS': {'charset': 'utf8mb4'},
-        'NAME': 'comment_db',
-        'USER': 'mazzi',
-        'PASSWORD': 'treering123!',
-        'HOST': '118.67.143.162',
-        'PORT': '3306',
-    }
-}
+DATABASES = my_settings.DATABASES
 
 
 # Password validation

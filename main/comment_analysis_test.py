@@ -1,19 +1,28 @@
 import torch
 import numpy as np
 import tensorflow as tf
-from transformers import BertTokenizer, BertTokenizerFast, TFBertForSequenceClassification, BertForSequenceClassification
+from transformers import DistilBertForSequenceClassification
+from main.tokenization_kobert import KoBertTokenizer
 from keras.preprocessing.sequence import pad_sequences
 import multiprocessing
 
 # 모델 설정
 device = torch.device('cpu') # gpu -> core gpu server -> ec2 gpu
-model = BertForSequenceClassification.from_pretrained('./main/model')
-tokenizer = BertTokenizer.from_pretrained('bert-base-multilingual-cased', do_lower_case=False)
+model = DistilBertForSequenceClassification.from_pretrained('./main/model')
+tokenizer =  KoBertTokenizer.from_pretrained('monologg/kobert', do_lower_case=False)
 
-def analysis_func(sentence):
-    logits = test_sentences([sentence])
-    positive = int(np.argmax(logits))
-    return [sentence, positive]
+
+def analysis_func(comment_info):
+    sentence_list = comment_info['sentence']
+    sentence_positive_list = comment_info['sentence_positive']
+
+    for sentence in sentence_list:
+        logits = test_sentences([sentence])
+        positive = int(np.argmax(logits))
+        sentence_positive = {'sentence': sentence, 'positive': positive}
+        sentence_positive_list.append(sentence_positive)
+    
+    return comment_info
 
 #     {'word_cloud: : {},
 # 'word_analysis':
@@ -25,8 +34,7 @@ def analysis_func(sentence):
 # 'negative_comment_list': []
 # }, 
 # }
-def commentAnalysisTest(word_dict, sentence_list): # 원본
-
+def commentAnalysisTest(word_dict, comment_info_list): # 원본
     # 평가모드로 변경
     global model
     model.eval()
@@ -35,7 +43,8 @@ def commentAnalysisTest(word_dict, sentence_list): # 원본
     set_word_list = word_dict.keys()
     for word in set_word_list: # 초기화 작업
         word_analysis[word] = {
-            'positive': 0, 
+            'positive': 0,
+            'positive_proportion': 0,
             'positive_count': 0,
             'negetive_count':0,
             'positive_comment_list': [],
@@ -44,21 +53,26 @@ def commentAnalysisTest(word_dict, sentence_list): # 원본
             
     # 멀티 프로세싱
     pool = multiprocessing.Pool(processes= 2)
-    sentence_positive_list = list(pool.map(analysis_func, sentence_list))
+    sentence_positive_list = list(pool.map(analysis_func, comment_info_list))
     pool.close()
     pool.join()
 
-    for sentence, positive in sentence_positive_list:
-        if positive == 1: # 댓글이 긍정-부정인지 확인
-            for word in word_dict.keys(): # 포함되는 키워드 확인
-                if word in sentence:
-                    word_analysis[word]['positive_count'] += 1
-                    word_analysis[word]['positive_comment_list'].append(sentence)
-        else:
-            for word in word_dict.keys():
-                if word in sentence:
-                    word_analysis[word]['negetive_count'] += 1
-                    word_analysis[word]['negative_comment_list'].append(sentence)
+
+    for sentence_positive in sentence_positive_list:
+        sentence_list = sentence_positive['sentence_positive']
+        for sentence_item in sentence_list:
+            sentence = sentence_item['sentence']
+            positive = sentence_item['positive']
+            if positive == 1: # 댓글이 긍정-부정인지 확인
+                for word in word_dict.keys(): # 포함되는 키워드 확인
+                    if word in sentence:
+                        word_analysis[word]['positive_count'] += 1
+                        word_analysis[word]['positive_comment_list'].append(sentence)
+            else:
+                for word in word_dict.keys():
+                    if word in sentence:
+                        word_analysis[word]['negetive_count'] += 1
+                        word_analysis[word]['negative_comment_list'].append(sentence)
         
             
     for value in word_analysis.values():
@@ -119,9 +133,7 @@ def test_sentences(sentences):
     with torch.no_grad():     
         # Forward 수행
         outputs = model(b_input_ids, 
-                        token_type_ids=None, 
                         attention_mask=b_input_mask)
-
     # 로스 구함
     logits = outputs[0]
 
