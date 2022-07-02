@@ -21,6 +21,7 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
 schema_url_patterns = [
+    path('api/v1/', include('main.urls')),
     path('api/v1/analysis/', include('analysis.urls')),
     path('api/v1/youtube_channel/', include('channel.urls')),
 ]

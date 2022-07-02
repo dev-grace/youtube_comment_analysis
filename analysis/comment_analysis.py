@@ -2,13 +2,13 @@ import torch
 import numpy as np
 import tensorflow as tf
 from transformers import DistilBertForSequenceClassification
-from main.tokenization_kobert import KoBertTokenizer
+from analysis.tokenization_kobert import KoBertTokenizer
 from keras.preprocessing.sequence import pad_sequences
 import multiprocessing
 
 # 모델 설정
 device = torch.device('cpu') # gpu -> core gpu server -> ec2 gpu
-model = DistilBertForSequenceClassification.from_pretrained('./main/model')
+model = DistilBertForSequenceClassification.from_pretrained('./analysis/model')
 tokenizer =  KoBertTokenizer.from_pretrained('monologg/kobert', do_lower_case=False)
 
 
@@ -34,7 +34,7 @@ def analysis_func(comment_info):
 # 'negative_comment_list': []
 # }, 
 # }
-def commentAnalysisTest(word_dict, comment_info_list): # 원본
+def commentAnalysis(word_dict, comment_info_list): # 원본
     # 평가모드로 변경
     global model
     model.eval()

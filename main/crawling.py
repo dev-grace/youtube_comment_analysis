@@ -1,4 +1,3 @@
-import pandas
 from googleapiclient.discovery import build
 import my_settings
 
