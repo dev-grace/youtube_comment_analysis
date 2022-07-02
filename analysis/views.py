@@ -2,6 +2,7 @@ from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.core.exceptions import ValidationError
+from torch import ne
 from main.comment_list import commentList, commentListTest
 from main.comment_analysis import commentAnalysis
 from main.comment_analysis_test import commentAnalysisTest
@@ -9,7 +10,7 @@ from main.word_cloud_test import wordDict, wordDictTest
 from googleapiclient.errors import HttpError
 from django.http import HttpResponse
 from main.models import UserLog
-from analysis.models import WordCloud
+from analysis.models import WordCloud, WordAnalysis, CommentAnalysis
 import json
 import secrets
 import time
@@ -118,6 +119,35 @@ class YoutubeUrl(APIView):  # 수정 테스트 API
             # 문장 분석
             analysis_result = commentAnalysisTest(word_dict, comment_info_list)
             print(analysis_result)
+            for key , value in analysis_result['word_analysis'].items():
+                word_cloud = WordCloud.objects.get(user_log_idx = userlog.user_log_idx, word = key)
+                
+                positive_count = value['positive_count']
+                negative_count = value['negetive_count']
+                positive_proportion = positive_count/(positive_count+ negative_count)*100
+                WordAnalysis.objects.create(word_cloud_idx= word_cloud, positive_proportion=positive_proportion, positive_count=positive_count, negative_count=negative_count)
+                for positive_comment in value['positive_comment_list']: # 긍정 댓글 저장
+                    
+                    profile_img = positive_comment['comment_info']['profile_img']
+                    nickname = positive_comment['comment_info']['profile_name']
+                    comment = positive_comment['comment']
+                    sentence = positive_comment['sentence']
+                    positive = True
+                    CommentAnalysis.objects.create(word_cloud_idx= word_cloud, profile_img=profile_img, nickname=nickname, comment=comment, sentence=sentence, positive=positive)
+
+                for negative_comment in value['negative_comment_list']: # 부정 댓글 저장
+                    
+                    profile_img = negative_comment['comment_info']['profile_img']
+                    nickname = negative_comment['comment_info']['profile_name']
+                    comment = negative_comment['comment']
+                    sentence = negative_comment['sentence']
+                    positive = False
+                    CommentAnalysis.objects.create(word_cloud_idx= word_cloud, profile_img=profile_img, nickname=nickname, comment=comment, sentence=sentence, positive=positive)
+                
+                
+                # WordAnalysis.objects.create
+
+
 
             result = {'code': code}
 

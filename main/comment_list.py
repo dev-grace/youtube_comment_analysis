@@ -13,8 +13,7 @@ def commentList(video_id): # 테스트
     while response:
         for item in response['items']:
             comment = item['snippet']['topLevelComment']['snippet']
-            comment_list.append({"profile_img": comment["authorProfileImageUrl"], "profile_name": comment['authorDisplayName'], "sentence": [], "sentence_positive": [], "comment": comment['textOriginal'], 
-            "comment_idx": 0, "datetime": comment['publishedAt']})
+            comment_list.append({"comment": comment['textOriginal'], "comment_info": {"profile_img": comment["authorProfileImageUrl"], "profile_name": comment['authorDisplayName'], "datetime": comment['publishedAt']}, "sentence": [], "sentence_positive": [], })
     
             # if item['snippet']['totalReplyCount'] > 0: # 대댓글 분석
             #     for reply_item in item['replies']['comments']:

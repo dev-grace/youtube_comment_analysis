@@ -44,7 +44,6 @@ def commentAnalysisTest(word_dict, comment_info_list): # 원본
     for word in set_word_list: # 초기화 작업
         word_analysis[word] = {
             'positive': 0,
-            'positive_proportion': 0,
             'positive_count': 0,
             'negetive_count':0,
             'positive_comment_list': [],
@@ -57,7 +56,6 @@ def commentAnalysisTest(word_dict, comment_info_list): # 원본
     pool.close()
     pool.join()
 
-
     for sentence_positive in sentence_positive_list:
         sentence_list = sentence_positive['sentence_positive']
         for sentence_item in sentence_list:
@@ -67,12 +65,12 @@ def commentAnalysisTest(word_dict, comment_info_list): # 원본
                 for word in word_dict.keys(): # 포함되는 키워드 확인
                     if word in sentence:
                         word_analysis[word]['positive_count'] += 1
-                        word_analysis[word]['positive_comment_list'].append(sentence)
+                        word_analysis[word]['positive_comment_list'].append({'sentence': sentence, 'comment': sentence_positive['comment'], 'comment_info': sentence_positive['comment_info']})
             else:
                 for word in word_dict.keys():
                     if word in sentence:
                         word_analysis[word]['negetive_count'] += 1
-                        word_analysis[word]['negative_comment_list'].append(sentence)
+                        word_analysis[word]['negative_comment_list'].append({'sentence': sentence, 'comment': sentence_positive['comment'], 'comment_info': sentence_positive['comment_info']})
         
             
     for value in word_analysis.values():
@@ -118,6 +116,7 @@ def convert_input_data(sentences):
     masks = torch.tensor(attention_masks)
 
     return inputs, masks
+
 
 # 문장 테스트
 def test_sentences(sentences):

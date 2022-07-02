@@ -60,8 +60,8 @@ class CommentAnalysis(models.Model):
     profile_img = models.CharField(max_length=300,
                             null=True) #이미지 url
     nickname = models.CharField(max_length=100, null = True) # 닉네임
-    comment = models.CharField(max_length=100) # 댓글
-    sentence = models.CharField(max_length=1000) # 문장
+    comment = models.TextField(max_length=10000) # 댓글
+    sentence = models.TextField(max_length=10000) # 문장
     positive = models.BooleanField(default = True) # 긍정여부
 
 
