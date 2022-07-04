@@ -14,6 +14,10 @@ class WordCloud(models.Model):
     class Meta:
             # managed = False
             db_table = 'word_cloud'
+        
+    @property
+    def text(self):
+        return self.word
 
 
 class ActiveInfo(models.Model):
@@ -49,6 +53,19 @@ class WordAnalysis(models.Model):
             # managed = False
             db_table = 'word_analysis'
 
+
+    @property
+    def prefer_idx(self):
+        return self.word_cloud_idx.word_cloud_idx
+    
+    @property
+    def text(self):
+        return self.word_cloud_idx.word
+
+    @property
+    def val(self):
+        return self.positive_proportion
+
 class CommentAnalysis(models.Model):
     comment_analysis_idx = models.BigAutoField(primary_key=True)
     word_cloud_idx = models.ForeignKey(
@@ -63,6 +80,12 @@ class CommentAnalysis(models.Model):
     comment = models.TextField(max_length=10000) # 댓글
     sentence = models.TextField(max_length=10000) # 문장
     positive = models.BooleanField(default = True) # 긍정여부
+
+
+    @property
+    def cmt_idx(self):
+        return self.comment_analysis_idx
+
 
 
     class Meta:

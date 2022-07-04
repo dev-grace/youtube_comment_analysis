@@ -40,5 +40,16 @@ class DailyUserCount(models.Model):
 
 class RequestStatus(models.Model):
     request_status_idx = models.BigAutoField(primary_key=True)
+    user_log_idx = models.ForeignKey(
+        'main.UserLog',
+        related_name='request_status_user_log_idx',
+        on_delete=models.RESTRICT,
+        db_column='user_log_idx'
+    )   #요청식별id
+    active_info_status = models.BooleanField(default = False)
     word_cloud_status = models.BooleanField(default = False)
     word_analysis_status = models.BooleanField(default = False)
+
+    class Meta:
+        # managed = False
+        db_table = 'request_status'

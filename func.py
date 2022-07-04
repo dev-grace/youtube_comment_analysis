@@ -1,10 +1,11 @@
 import logging
 import re
-from main.models import IpCount
+from main.models import IpCount, RequestStatus
 from analysis.comment_list import commentList
 from analysis.comment_analysis import commentAnalysis
 from analysis.word_cloud import wordDict
-from analysis.models import WordCloud, WordAnalysis, CommentAnalysis
+from analysis.video_info import videoInfo
+from analysis.models import ActiveInfo, WordCloud, WordAnalysis, CommentAnalysis
 import time
 
 
@@ -41,18 +42,29 @@ def ip_count(ip):
         IpCount.objects.create(ip=ip)
 
 def background_func(video_id, userlog):
+    # 상태 기록
+    request_status = RequestStatus.objects.create(user_log_idx=userlog)
+
+
     #댓글 수집
     comment_detail_list = commentList(video_id)
+
+    #적극적 사용자 비율
+    view_count, comment_count = videoInfo(video_id)
+    active_proportion = comment_count/view_count * 100
+    ActiveInfo.objects.create(user_log_idx= userlog, active_proportion=active_proportion, comment_count=comment_count, view_count=view_count)
+    request_status.active_info_status = True
+    request_status.save()
 
     #워드 클라우드
     word_dict, comment_info_list = wordDict(
         comment_detail_list)  # 워드 클라우드 포함되는 문장
 
     word_colut_list = [WordCloud(
-        user_log_idx=userlog, word=word, weight=weight) for weight, word in enumerate(word_dict)]
+        user_log_idx=userlog, word=word, weight=weight) for word, weight in word_dict.items()]
     WordCloud.objects.bulk_create(word_colut_list)
-
-    
+    request_status.word_cloud_status = True
+    request_status.save()
 
     # 문장 분석
     analysis_result = commentAnalysis(word_dict, comment_info_list)
@@ -81,6 +93,10 @@ def background_func(video_id, userlog):
             sentence = negative_comment['sentence']
             positive = False
             CommentAnalysis.objects.create(word_cloud_idx= word_cloud, profile_img=profile_img, nickname=nickname, comment=comment, sentence=sentence, positive=positive)
+
+    request_status.word_analysis_status = True
+    request_status.save()
+
 
 def test_check_func(video_id):
     result = {}

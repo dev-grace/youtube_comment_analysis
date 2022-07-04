@@ -2,6 +2,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.core.exceptions import ValidationError
 from googleapiclient.errors import HttpError
+from analysis.models import WordCloud, ActiveInfo, WordAnalysis, CommentAnalysis
+from analysis.serializers import WordCloudSerializer, WordAnalysisSerializer, CommentAnalysisSerializer
 from main.models import UserLog
 import secrets
 from func import dataCheck, get_client_ip, get_video_url, ip_count, test_check_func, background_func
@@ -10,6 +12,7 @@ from drf_yasg import openapi
 from rest_framework.decorators import permission_classes
 from rest_framework.permissions import AllowAny
 from django.http import JsonResponse
+import threading
 
 
 @permission_classes([AllowAny])
@@ -69,8 +72,8 @@ class YoutubeUrl(APIView):  # 수정 테스트 API
 
             userlog = UserLog.objects.create(code=code, ip=user_ip,
                                              target_url=target_url, youtube_id=video_id)
-
-            background_func(video_id, userlog)
+            thread = threading.Thread(target = background_func, args = (video_id, userlog))
+            thread.start()
                 
             result = {'code': code}
 
@@ -102,137 +105,18 @@ class WordCloudView(APIView):  # 워드 클라우드 API
             data = request.GET.dict()
             dataCheck(data)
             code = data['code']
-            # comment_list = commentListTest('aPoGBJrZryI')
-            # word_dict, sentence_list, all_sentence_list = wordDictTest(code, comment_list) #임시 비교 위한 전체 문장리스트
-
             result = {}
-            result['code'] = '0473904e48aaa9ab3959'
-            result['data'] = [
-                {
-                    'weight': 164,
-                    'text': '삐루'
-                },
-                {
-                    'weight': 130,
-                    'text': '영상'
-                },
-                {
-                    'weight': 125,
-                    'text': '수빈'
-                },
-                {
-                    'weight': 82,
-                    'text': '가족'
-                },
-                {
-                    'weight': 77,
-                    'text': '행복'
-                },
-                {
-                    'weight': 47,
-                    'text': '언니'
-                },
-                {
-                    'weight': 42,
-                    'text': '오늘'
-                },
-                {
-                    'weight': 39,
-                    'text': '사랑'
-                },
-                {
-                    'weight': 37,
-                    'text': '응원'
-                },
-                {
-                    'weight': 37,
-                    'text': '건강'
-                },
-                {
-                    'weight': 32,
-                    'text': '감사'
-                },
-                {
-                    'weight': 28,
-                    'text': '뼈'
-                },
-                {
-                    'weight': 27,
-                    'text': '할머니'
-                },
-                {
-                    'weight': 24,
-                    'text': '용'
-                },
-                {
-                    'weight': 23,
-                    'text': '집'
-                },
-                {
-                    'weight': 22,
-                    'text': '엄마'
-                },
-                {
-                    'weight': 22,
-                    'text': '사람'
-                },
-                {
-                    'weight': 21,
-                    'text': '모습'
-                },
-                {
-                    'weight': 20,
-                    'text': '모자'
-                },
-                {
-                    'weight': 20,
-                    'text': '덤홀덤'
-                },
-                {
-                    'weight': 20,
-                    'text': '기분'
-                },
-                {
-                    'weight': 20,
-                    'text': '마음'
-                },
-                {
-                    'weight': 19,
-                    'text': '전'
-                },
-                {
-                    'weight': 18,
-                    'text': '손목'
-                },
-                {
-                    'weight': 18,
-                    'text': '어머님'
-                },
-                {
-                    'weight': 17,
-                    'text': '힐링'
-                },
-                {
-                    'weight': 17,
-                    'text': '하루'
-                },
-                {
-                    'weight': 16,
-                    'text': '발음'
-                },
-                {
-                    'weight': 15,
-                    'text': '신경'
-                },
-                {
-                    'weight': 15,
-                    'text': '조심'
-                },
-            ]
+            result['code'] = code
+            if UserLog.objects.filter(code=code).exists():
+                user_log = UserLog.objects.get(code=code)
+                # word_cloud_list = WordCloud.objects.filter(user_log_idx= user_log.user_log_idx).order_by('-weight')
+                word_cloud_list = WordCloud.objects.filter(user_log_idx= user_log.user_log_idx) # 정렬된 순서
+                serializer = WordCloudSerializer(word_cloud_list, many=True)
+                result['data'] = serializer.data
+                return JsonResponse(result, status=200)
+            else:
+                return Response({'message': 'CODE_ERROR'}, status=404)
 
-            return JsonResponse(result, status=200)
-        except HttpError:  # 유튜브 링크 에러
-            return Response({'message': 'URL_ERROR'}, status=404)
         except KeyError:
             return Response({'message': 'key wrong'}, status=402)
         except TypeError:
@@ -259,15 +143,17 @@ class ActiveInfoView(APIView):  # 조회수 대비 적극시청자 API
             data = request.GET.dict()
             dataCheck(data)
             code = data['code']
-            # comment_list = commentListTest('aPoGBJrZryI')
-            # word_dict, sentence_list, all_sentence_list = wordDictTest(code, comment_list) #임시 비교 위한 전체 문장리스트
-
-            comment_count = 574
-            view_count = 287894
-
             result = {}
-            result['code'] = '0473904e48aaa9ab3959'
-            result['active_num'] = comment_count/view_count
+            result['code'] = code
+            if UserLog.objects.filter(code=code).exists():
+                user_log = UserLog.objects.get(code=code)
+                if ActiveInfo.objects.filter(user_log_idx= user_log.user_log_idx):
+                    active_info = ActiveInfo.objects.get(user_log_idx= user_log.user_log_idx)
+                    result['active_num'] = active_info.active_proportion
+                return JsonResponse(result, status=200)
+            else:
+                return Response({'message': 'CODE_ERROR'}, status=404)
+
 
             return JsonResponse(result, status=200)
         except HttpError:  # 유튜브 링크 에러
@@ -298,84 +184,22 @@ class WordAnalysisView(APIView):  # 단어 분석 API
             data = request.GET.dict()
             dataCheck(data)
             code = data['code']
-            # comment_list = commentListTest('aPoGBJrZryI')
-            # word_dict, sentence_list, all_sentence_list = wordDictTest(code, comment_list) #임시 비교 위한 전체 문장리스트
 
             result = {}
-            result['code'] = '0473904e48aaa9ab3959'
-            result['prefer_list'] = [
-                {
-                    'prefer_idx': 1,
-                    'text': '삐루',
-                    'val': 0.80
-                },
-                {
-                    'prefer_idx': 2,
-                    'text': '영상',
-                    'val': 0.30
-                },
-                {
-                    'prefer_idx': 3,
-                    'text': '수빈',
-                    'val': 0.67
-                },
-                {
-                    'prefer_idx': 4,
-                    'text': '가족',
-                    'val': 0.70
-                },
-                {
-                    'prefer_idx': 5,
-                    'text': '행복',
-                    'val': 0.73
-                },
-                {
-                    'prefer_idx': 6,
-                    'text': '언니',
-                    'val': 0.55
-                },
-                {
-                    'prefer_idx': 7,
-                    'text': '오늘',
-                    'val': 0.52
-                },
-                {
-                    'prefer_idx': 8,
-                    'text': '사랑',
-                    'val': 0.30
-                },
-                {
-                    'prefer_idx': 9,
-                    'text': '응원',
-                    'val': 0.90
-                },
-                {
-                    'prefer_idx': 10,
-                    'text': '건강',
-                    'val': 0.53
-                },
-                {
-                    'prefer_idx': 11,
-                    'text': '감사',
-                    'val': 0.40
-                },
-                {
-                    'prefer_idx': 12,
-                    'text': '뼈',
-                    'val': 0.28
-                },
-                {
-                    'prefer_idx': 13,
-                    'text': '할머니',
-                    'val': 0.90
-                },
-                {
-                    'prefer_idx': 14,
-                    'text': '용',
-                    'val': 0.10
-                }
-            ]
-            return JsonResponse(result, status=200)
+            result['code'] = code
+            if UserLog.objects.filter(code=code).exists():
+                user_log = UserLog.objects.get(code=code)
+                if WordCloud.objects.filter(user_log_idx=user_log.user_log_idx).exists():
+                    word_cloud_list = WordCloud.objects.filter(user_log_idx=user_log.user_log_idx)
+                    word_analysis_list = WordAnalysis.objects.filter(word_cloud_idx__in= word_cloud_list)
+                    serializer = WordAnalysisSerializer(word_analysis_list, many=True)
+                    result['prefer_list'] = serializer.data
+                    return JsonResponse(result, status=200)
+                else:
+                    return Response({'message': 'WordCloud Not Found'}, status=404)
+            else:
+                return Response({'message': 'CODE_ERROR'}, status=404)
+
         except HttpError:  # 유튜브 링크 에러
             return Response({'message': 'URL_ERROR'}, status=404)
         except KeyError:
@@ -402,64 +226,25 @@ class CommentAnalysisView(APIView):  # 단어별 댓글 분석 API
         try:
             prefer_idx = request.GET.get('prefer_idx', None)
             dataCheck(prefer_idx)
-            # comment_list = commentListTest('aPoGBJrZryI')
-            # word_dict, sentence_list, all_sentence_list = wordDictTest(code, comment_list) #임시 비교 위한 전체 문장리스트
 
             result = {}
-            result['prefer'] = {}
-            result['prefer']['prefer_idx'] = prefer_idx
-            result['prefer']['text'] = '행복'
-            result['prefer']['val'] = 0.73
-            result['pos_cnt'] = 4
-            result['neg_cnt'] = 2
-            result['pos_cmt'] = [
-                {
-                    'cmt_idx': 1,
-                    'profile_img': 'https://kr.object.ncloudstorage.com/mazzi/public_data/util/logo.png',
-                    'comment': '패스룸 고양이샴푸  삐루 사용해도 되요',
-                    'nickname': '닉네임1',
-                    'sentence': '패스룸 고양이샴푸  삐루 사용해도 되요',
-                },
-                {
-                    'cmt_idx': 2,
-                    'profile_img': 'https://kr.object.ncloudstorage.com/mazzi/public_data/util/logo.png',
-                    'comment': '삐루 너무 귀엽다',
-                    'nickname': '닉네임2',
-                    'sentence': '삐루 너무 귀엽다~! 삐루빼로님도 꼭 루게릭병을 극복하는 모습을 멋지게 보여줬으면 좋겠습니다',
-                },
-                {
-                    'cmt_idx': 3,
-                    'profile_img': 'https://kr.object.ncloudstorage.com/mazzi/public_data/util/logo.png',
-                    'comment': '삐루는 날이갈수록 귀여워지네요',
-                    'nickname': '닉네임3',
-                    'sentence': '삐루는 날이갈수록 귀여워지네요 아 삐루 삐진 거 귀여워서 또 보러 왓거든여  영상 다시보는데 간식먹자 하니깐 삐진 와중에 귀 잠깐 쫑끗 하는 거 넘나 욱겨요 귀는 어쩔 수가 없나봐여',
-                },
-                {
-                    'cmt_idx': 4,
-                    'profile_img': 'https://kr.object.ncloudstorage.com/mazzi/public_data/util/logo.png',
-                    'comment': '삐루 마지막에 \n화분이되고싶은가봉가',
-                    'nickname': '닉네임4',
-                    'sentence': '삐루 마지막에 \n화분이되고싶은가봉가',
-                },
-            ]
-            result['neg_cmt'] = [
-                {
-                    'cmt_idx': 5,
-                    'profile_img': 'https://kr.object.ncloudstorage.com/mazzi/public_data/util/logo.png',
-                    'comment': '삐루 너무귀엽다고',
-                    'nickname': '닉네임5',
-                    'sentence': '삐루 너무귀엽다고',
-                },
-                {
-                    'cmt_idx': 6,
-                    'profile_img': 'https://kr.object.ncloudstorage.com/mazzi/public_data/util/logo.png',
-                    'comment': '신경쓰이는 재질 박삐루',
-                    'nickname': '닉네임6',
-                    'sentence': '신경쓰이는 재질 박삐루 종종 멍때리다보면 저도 모르게 삐루삐루삐루이러고 있어여',
-                },
-            ]
 
-            return JsonResponse(result, status=200)
+            if WordAnalysis.objects.filter(word_cloud_idx = prefer_idx).exists():
+                prefer = WordAnalysis.objects.get(word_cloud_idx=prefer_idx)
+                serializer = WordAnalysisSerializer(prefer)
+                result['prefer'] = serializer.data
+                result['pos_cnt'] = prefer.positive_count
+                result['neg_cnt'] = prefer.negative_count
+                pos_comment_list = CommentAnalysis.objects.filter(word_cloud_idx=prefer_idx, positive = True)
+                neg_comment_list = CommentAnalysis.objects.filter(word_cloud_idx=prefer_idx, positive = False)
+                positive_serializer = CommentAnalysisSerializer(pos_comment_list, many=True)
+                negative_serializer = CommentAnalysisSerializer(neg_comment_list, many=True)
+                result['pos_cmt'] = positive_serializer.data
+                result['neg_cmt'] = negative_serializer.data
+                return JsonResponse(result, status=200)
+            else:
+                return Response({'message': 'PREFER_IDX_ERROR'}, status=404)
+
         except HttpError:  # 유튜브 링크 에러
             return Response({'message': 'URL_ERROR'}, status=404)
         except KeyError:
