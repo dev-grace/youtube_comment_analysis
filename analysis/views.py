@@ -188,6 +188,61 @@ class ActiveInfoView(APIView):  # 조회수 대비 적극시청자 API
         except: # 예상치 못한 에러
             return Response({'message': 'ERROR'}, status=404)
 
+@permission_classes([AllowAny])
+class TopWordAnalysisView(APIView):  # 단어 분석 API
+
+    @swagger_auto_schema(
+        manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
+            400: 'this is a test description.',
+            500: 'this is a test description.'})
+    def get(self, request):
+        """
+        단어 분석 API
+        ---
+        # 내용
+            code : 요청 식별 코드
+        """
+        try:
+            data = request.GET.dict()
+            dataCheck(data)
+            code = data['code']
+
+            result = {}
+            result['code'] = code
+
+            if UserLog.objects.filter(code=code).exists():
+                user_log = UserLog.objects.get(code=code)
+               
+                while True:
+                    request_status = RequestStatus.objects.get(user_log_idx= user_log.user_log_idx)
+                    if request_status.top_word_analysis_status:
+                        if WordCloud.objects.filter(user_log_idx=user_log.user_log_idx).exists():
+                            word_cloud_list = WordCloud.objects.filter(user_log_idx=user_log.user_log_idx)
+                            if len(WordAnalysis.objects.filter(word_cloud_idx__in= word_cloud_list)) >= 4:
+                                word_analysis_list = WordAnalysis.objects.filter(word_cloud_idx__in= word_cloud_list)[:4]
+                            else:
+                                word_analysis_list = WordAnalysis.objects.filter(word_cloud_idx__in= word_cloud_list)
+                            serializer = WordAnalysisSerializer(word_analysis_list, many=True)
+                            result['prefer_list'] = serializer.data
+                            return JsonResponse(result, status=200)
+                        else:
+                            return Response({'message': 'WordCloud Not Found'}, status=404)
+                    sleep(1)
+
+            else:
+                return Response({'message': 'CODE_ERROR'}, status=404)
+
+        except HttpError:  # 유튜브 링크 에러
+            return Response({'message': 'URL_ERROR'}, status=404)
+        except KeyError:
+            return Response({'message': 'key wrong'}, status=402)
+        except TypeError:
+            return Response({'message': 'type wrong'}, status=403)
+        except ValidationError:
+            return Response({'message': 'VALIDATION_ERROR'}, status=404)
+        except: # 예상치 못한 에러
+            return Response({'message': 'ERROR'}, status=404)
+
 
 @permission_classes([AllowAny])
 class WordAnalysisView(APIView):  # 단어 분석 API
@@ -261,25 +316,20 @@ class CommentAnalysisView(APIView):  # 단어별 댓글 분석 API
 
             result = {}
 
-            if WordAnalysis.objects.filter(word_analysis_idx=prefer_idx).exists():
-                user_log = WordAnalysis.objects.get(word_analysis_idx=prefer_idx).word_cloud_idx.user_log_idx
-                
-                while True:
-                    request_status = RequestStatus.objects.get(user_log_idx= user_log.user_log_idx)
-                    if request_status.word_analysis_status:
-                        prefer = WordAnalysis.objects.get(word_cloud_idx=prefer_idx)
-                        serializer = WordAnalysisSerializer(prefer)
-                        result['prefer'] = serializer.data
-                        result['pos_cnt'] = prefer.positive_count
-                        result['neg_cnt'] = prefer.negative_count
-                        pos_comment_list = CommentAnalysis.objects.filter(word_cloud_idx=prefer_idx, positive = True)
-                        neg_comment_list = CommentAnalysis.objects.filter(word_cloud_idx=prefer_idx, positive = False)
-                        positive_serializer = CommentAnalysisSerializer(pos_comment_list, many=True)
-                        negative_serializer = CommentAnalysisSerializer(neg_comment_list, many=True)
-                        result['pos_cmt'] = positive_serializer.data
-                        result['neg_cmt'] = negative_serializer.data
-                        return JsonResponse(result, status=200)
-                    sleep(1)
+            if WordAnalysis.objects.filter(word_cloud_idx=prefer_idx).exists():
+                prefer = WordAnalysis.objects.get(word_cloud_idx=prefer_idx)
+                serializer = WordAnalysisSerializer(prefer)
+                result['prefer'] = serializer.data
+                result['pos_cnt'] = prefer.positive_count
+                result['neg_cnt'] = prefer.negative_count
+                pos_comment_list = CommentAnalysis.objects.filter(word_cloud_idx=prefer_idx, positive = True)
+                neg_comment_list = CommentAnalysis.objects.filter(word_cloud_idx=prefer_idx, positive = False)
+                positive_serializer = CommentAnalysisSerializer(pos_comment_list, many=True)
+                negative_serializer = CommentAnalysisSerializer(neg_comment_list, many=True)
+                result['pos_cmt'] = positive_serializer.data
+                result['neg_cmt'] = negative_serializer.data
+                return JsonResponse(result, status=200)
+    
             else:
                 return Response({'message': 'PREFER_IDX_ERROR'}, status=404)
                    

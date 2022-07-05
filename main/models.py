@@ -48,6 +48,7 @@ class RequestStatus(models.Model):
     )   #요청식별id
     active_info_status = models.BooleanField(default = False)
     word_cloud_status = models.BooleanField(default = False)
+    top_word_analysis_status = models.BooleanField(default = False)
     word_analysis_status = models.BooleanField(default = False)
 
     class Meta:

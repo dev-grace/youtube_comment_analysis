@@ -2,7 +2,7 @@ import logging
 import re
 from main.models import IpCount, RequestStatus
 from analysis.comment_list import commentList
-from analysis.comment_analysis import commentAnalysis
+from analysis.comment_analysis import commentAnalysis, topcommentAnalysis, elsecommentAnalysis
 from analysis.word_cloud import wordDict
 from analysis.video_info import videoInfo
 from analysis.models import ActiveInfo, WordCloud, WordAnalysis, CommentAnalysis
@@ -66,12 +66,32 @@ def background_func(video_id, userlog):
     request_status.word_cloud_status = True
     request_status.save()
 
-    # 문장 분석
-    analysis_result = commentAnalysis(word_dict, comment_info_list)
+    
+    if len(word_dict)>= 4:
+        # top 4 문장 분석
+        word_analysis, top_result, else_comment_info_list = topcommentAnalysis(word_dict, comment_info_list)
+        comment_analysis_func(userlog, top_result)
 
-    for key , value in analysis_result['word_analysis'].items():
+        request_status.top_word_analysis_status = True
+        request_status.save()
+
+        # 이외 문장 분석
+        else_analysis_result = elsecommentAnalysis(word_dict, word_analysis, else_comment_info_list)
+        comment_analysis_func(userlog, else_analysis_result)
+    else:
+        analysis_result = commentAnalysis(word_dict, comment_info_list)
+        comment_analysis_func(userlog, analysis_result['word_analysis'])
+
+
+    request_status.word_analysis_status = True
+    request_status.save()
+
+
+def comment_analysis_func(userlog, analysis_result):
+
+    for key , value in analysis_result.items():
+
         word_cloud = WordCloud.objects.get(user_log_idx = userlog.user_log_idx, word = key)
-        
         positive_count = value['positive_count']
         negative_count = value['negetive_count']
         positive_proportion = positive_count/(positive_count+ negative_count)*100
@@ -94,8 +114,6 @@ def background_func(video_id, userlog):
             positive = False
             CommentAnalysis.objects.create(word_cloud_idx= word_cloud, profile_img=profile_img, nickname=nickname, comment=comment, sentence=sentence, positive=positive)
 
-    request_status.word_analysis_status = True
-    request_status.save()
 
 
 def test_check_func(video_id):

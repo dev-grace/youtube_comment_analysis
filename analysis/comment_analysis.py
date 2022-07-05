@@ -5,6 +5,7 @@ from transformers import DistilBertForSequenceClassification
 from analysis.tokenization_kobert import KoBertTokenizer
 from keras.preprocessing.sequence import pad_sequences
 import multiprocessing
+import itertools
 
 # 모델 설정
 device = torch.device('cpu') # gpu -> core gpu server -> ec2 gpu
@@ -24,16 +25,7 @@ def analysis_func(comment_info):
     
     return comment_info
 
-#     {'word_cloud: : {},
-# 'word_analysis':
-# 'key': {
-# 'positive': true, false, 
-# 'positive_count': 10, 
-# 'negetive_count': 20
-# 'positive_comment_list': []
-# 'negative_comment_list': []
-# }, 
-# }
+
 def commentAnalysis(word_dict, comment_info_list): # 원본
     # 평가모드로 변경
     global model
@@ -85,6 +77,112 @@ def commentAnalysis(word_dict, comment_info_list): # 원본
     
 
     return result
+
+
+def topcommentAnalysis(word_dict, comment_info_list): # top 4분석
+    # 평가모드로 변경
+    global model
+    model.eval()
+
+    word_analysis = {}
+    set_word_list = word_dict.keys()
+    for word in set_word_list: # 초기화 작업
+        word_analysis[word] = {
+            'positive': 0,
+            'positive_count': 0,
+            'negetive_count':0,
+            'positive_comment_list': [],
+            'negative_comment_list':[]
+            }
+
+    top_comment_info_list = []
+    else_comment_info_list = []
+    for comment_info in comment_info_list:
+        comment = comment_info['comment']
+        if any(keyword in comment for keyword in list(word_dict.keys())[:4]): # 상위 단어에 포함되는 댓글만 추출
+            top_comment_info_list.append(comment_info)
+        else:
+            else_comment_info_list.append(comment_info)
+            
+    # 멀티 프로세싱
+    pool = multiprocessing.Pool(processes= 2)
+    sentence_positive_list = list(pool.map(analysis_func, top_comment_info_list))
+    pool.close()
+    pool.join()
+
+    for sentence_positive in sentence_positive_list:
+        sentence_list = sentence_positive['sentence_positive']
+        for sentence_item in sentence_list:
+            sentence = sentence_item['sentence']
+            positive = sentence_item['positive']
+            if positive == 1: # 댓글이 긍정-부정인지 확인
+                for word in word_dict.keys(): # 포함되는 키워드 확인
+                    if word in sentence:
+                        word_analysis[word]['positive_count'] += 1
+                        word_analysis[word]['positive_comment_list'].append({'sentence': sentence, 'comment': sentence_positive['comment'], 'comment_info': sentence_positive['comment_info']})
+            else:
+                for word in word_dict.keys():
+                    if word in sentence:
+                        word_analysis[word]['negetive_count'] += 1
+                        word_analysis[word]['negative_comment_list'].append({'sentence': sentence, 'comment': sentence_positive['comment'], 'comment_info': sentence_positive['comment_info']})
+        
+            
+    for value in word_analysis.values():
+        if value['positive_count'] > value['negetive_count']:
+            value['positive'] = 1
+        elif value['positive_count'] < value['negetive_count']:
+            value['positive'] = -1
+
+    top_result = dict( itertools.islice(word_analysis.items(), 0 , 4) )
+    
+
+    return word_analysis, top_result, else_comment_info_list
+
+
+def elsecommentAnalysis(word_dict, word_analysis, comment_info_list): # top 4 제외 분석
+    # 평가모드로 변경
+    global model
+    model.eval()
+            
+    # 멀티 프로세싱
+    pool = multiprocessing.Pool(processes= 2)
+    sentence_positive_list = list(pool.map(analysis_func, comment_info_list))
+    pool.close()
+    pool.join()
+
+    for sentence_positive in sentence_positive_list:
+        sentence_list = sentence_positive['sentence_positive']
+        for sentence_item in sentence_list:
+            sentence = sentence_item['sentence']
+            positive = sentence_item['positive']
+            if positive == 1: # 댓글이 긍정-부정인지 확인
+                for word in word_dict.keys(): # 포함되는 키워드 확인
+                    if word in sentence:
+                        word_analysis[word]['positive_count'] += 1
+                        word_analysis[word]['positive_comment_list'].append({'sentence': sentence, 'comment': sentence_positive['comment'], 'comment_info': sentence_positive['comment_info']})
+            else:
+                for word in word_dict.keys():
+                    if word in sentence:
+                        word_analysis[word]['negetive_count'] += 1
+                        word_analysis[word]['negative_comment_list'].append({'sentence': sentence, 'comment': sentence_positive['comment'], 'comment_info': sentence_positive['comment_info']})
+        
+            
+    for value in word_analysis.values():
+        if value['positive_count'] > value['negetive_count']:
+            value['positive'] = 1
+        elif value['positive_count'] < value['negetive_count']:
+            value['positive'] = -1
+
+
+    
+    dict_len = len(word_analysis)
+    else_analysis_result = dict(itertools.islice(word_analysis.items(), 4 , dict_len) )
+    print(else_analysis_result)
+    return else_analysis_result
+
+
+
+
 
 # 입력 데이터 변환
 def convert_input_data(sentences):
