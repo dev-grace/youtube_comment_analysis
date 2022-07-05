@@ -127,6 +127,8 @@ STATIC_URL = '/static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 CRONJOBS = [
     ('0 0 * * *', 'mazzi.cron.user_analysis', '>> /home/youtube_comment_analysis/user_analysis.log'),
 ]
