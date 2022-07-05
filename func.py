@@ -41,10 +41,9 @@ def ip_count(ip):
     else:
         IpCount.objects.create(ip=ip)
 
-def background_func(video_id, userlog):
+def defalut_func(video_id, userlog):
     # 상태 기록
     request_status = RequestStatus.objects.create(user_log_idx=userlog)
-
 
     #댓글 수집
     comment_detail_list = commentList(video_id)
@@ -56,6 +55,11 @@ def background_func(video_id, userlog):
     request_status.active_info_status = True
     request_status.save()
 
+    return request_status, comment_detail_list, comment_count
+
+
+
+def background_func(userlog, request_status, comment_detail_list):
     #워드 클라우드
     word_dict, comment_info_list = wordDict(
         comment_detail_list)  # 워드 클라우드 포함되는 문장

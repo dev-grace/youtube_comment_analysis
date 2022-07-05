@@ -50,6 +50,8 @@ class RequestStatus(models.Model):
     word_cloud_status = models.BooleanField(default = False)
     top_word_analysis_status = models.BooleanField(default = False)
     word_analysis_status = models.BooleanField(default = False)
+    created_at = models.DateTimeField(auto_now_add=True)  # 최초 요청 일시
+    updated_at = models.DateTimeField(auto_now=True)  # 최근 요청 일시
 
     class Meta:
         # managed = False

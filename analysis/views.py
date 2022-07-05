@@ -6,7 +6,7 @@ from analysis.models import WordCloud, ActiveInfo, WordAnalysis, CommentAnalysis
 from analysis.serializers import WordCloudSerializer, WordAnalysisSerializer, CommentAnalysisSerializer
 from main.models import UserLog, RequestStatus
 import secrets
-from func import dataCheck, get_client_ip, get_video_url, ip_count, test_check_func, background_func
+from func import dataCheck, get_client_ip, get_video_url, ip_count, test_check_func, defalut_func, background_func
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.decorators import permission_classes
@@ -19,8 +19,11 @@ from time import sleep
 class Test(APIView):  # 수정 테스트 API
     @swagger_auto_schema(
         manual_parameters=[openapi.Parameter('target_url', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
-            400: 'this is a test description.',
-            500: 'this is a test description.'})
+            401: 'URL ERROR(URL이 잘못되거나 비공개 영상일 경우)',
+            402: 'KEY WRONG',
+            403: 'TYPE WRONG',
+            404: 'ERROR(예상치 못한 에러)',
+            500: 'SERVER ERROR'})
     def get(self, request):
         try:
             data = request.GET.dict()
@@ -31,13 +34,11 @@ class Test(APIView):  # 수정 테스트 API
 
             return JsonResponse(result, status=200)
         except HttpError:  # 유튜브 링크 에러
-            return Response({'message': 'URL_ERROR'}, status=404)
+            return Response({'message': 'URL ERROR'}, status=401)
         except KeyError:
-            return Response({'message': 'key wrong'}, status=402)
+            return Response({'message': 'KEY WRONG'}, status=402)
         except TypeError:
-            return Response({'message': 'type wrong'}, status=403)
-        except ValidationError:
-            return Response({'message': 'VALIDATION_ERROR'}, status=404)
+            return Response({'message': 'TYPE WRONG'}, status=403)
         except: # 예상치 못한 에러
             return Response({'message': 'ERROR'}, status=404)
 
@@ -46,8 +47,13 @@ class Test(APIView):  # 수정 테스트 API
 class YoutubeUrl(APIView):  # 수정 테스트 API
     @swagger_auto_schema(
         manual_parameters=[openapi.Parameter('target_url', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
-            400: 'this is a test description.',
-            500: 'this is a test description.'})
+            400: 'ANALYSIS FAIL(영상 댓글 50개 이하인 경우)',
+            401: 'URL ERROR(URL이 잘못되거나 비공개 영상일 경우)',
+            402: 'KEY WRONG',
+            403: 'TYPE WRONG',
+            403: 'QUOTA EXCEEDED(유튜브 할당량 초과)',
+            404: 'ERROR(예상치 못한 에러)',
+            500: 'SERVER ERROR'})
     def get(self, request):
         """
         URL 전송 API
@@ -75,20 +81,27 @@ class YoutubeUrl(APIView):  # 수정 테스트 API
             userlog = UserLog.objects.create(code=code, ip=user_ip,
                                              target_url=target_url, youtube_id=video_id)
 
-            thread = threading.Thread(target = background_func, args = (video_id, userlog))
-            thread.start()
-                
-            result = {'code': code}
+            
+            request_status, comment_detail_list, comment_count = defalut_func(video_id, userlog)
+            
+            if comment_count < 50:
+                return Response({'message': 'ANALYSIS FAIL'}, status=400)
+            else:
+                thread = threading.Thread(target = background_func, args = (userlog, request_status, comment_detail_list))
+                thread.start()
+                    
+                result = {'code': code}
 
-            return JsonResponse(result, status=200)
-        except HttpError:  # 유튜브 링크 에러
-            return Response({'message': 'URL_ERROR'}, status=404)
+                return JsonResponse(result, status=200)
+        except HttpError as e:   #유튜브 에러
+            if "exceeded" in e.reason: # 유튜브 할당량 초과
+                return Response({'message': 'QUOTA EXCEEDED'}, status=403)
+            else: # 유튜브 링크 에러
+                return Response({'message': 'URL_ERROR'}, status=401)
         except KeyError:
-            return Response({'message': 'key wrong'}, status=402)
+            return Response({'message': 'KEY WRONG'}, status=402)
         except TypeError:
-            return Response({'message': 'type wrong'}, status=403)
-        except ValidationError:
-            return Response({'message': 'VALIDATION_ERROR'}, status=404)
+            return Response({'message': 'TYPE WRONG'}, status=403)
         except: # 예상치 못한 에러
             return Response({'message': 'ERROR'}, status=404)
 
@@ -97,8 +110,11 @@ class YoutubeUrl(APIView):  # 수정 테스트 API
 class WordCloudView(APIView):  # 워드 클라우드 API
     @swagger_auto_schema(
         manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
-            400: 'this is a test description.',
-            500: 'this is a test description.'})
+            401: 'CODE ERROR(code(요청식별코드)가 잘못되었을 경우)',
+            402: 'KEY WRONG',
+            403: 'TYPE WRONG',
+            404: 'ERROR(예상치 못한 에러)',
+            500: 'SERVER ERROR'})
     def get(self, request):
         """
         워드 클라우드 API
@@ -127,14 +143,12 @@ class WordCloudView(APIView):  # 워드 클라우드 API
                     sleep(1)
 
             else:
-                return Response({'message': 'CODE_ERROR'}, status=404)
+                return Response({'message': 'CODE ERROR'}, status=401)
 
         except KeyError:
-            return Response({'message': 'key wrong'}, status=402)
+            return Response({'message': 'KEY WRONG'}, status=402)
         except TypeError:
-            return Response({'message': 'type wrong'}, status=403)
-        except ValidationError:
-            return Response({'message': 'VALIDATION_ERROR'}, status=404)
+            return Response({'message': 'TYPE WRONG'}, status=403)
         except: # 예상치 못한 에러
             return Response({'message': 'ERROR'}, status=404)
 
@@ -142,8 +156,12 @@ class WordCloudView(APIView):  # 워드 클라우드 API
 class ActiveInfoView(APIView):  # 조회수 대비 적극시청자 API
     @swagger_auto_schema(
         manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
-            400: 'this is a test description.',
-            500: 'this is a test description.'})
+            400: 'ActiveInfo Not Found(적극 시청자 정보가 없을 경우)',
+            401: 'CODE ERROR(요청식별코드가 잘못되었을 경우)',
+            402: 'KEY WRONG',
+            403: 'TYPE WRONG',
+            404: 'ERROR(예상치 못한 에러)',
+            500: 'SERVER ERROR'})
     def get(self, request):
         """
         조회수 대비 적극시청자 API
@@ -171,20 +189,16 @@ class ActiveInfoView(APIView):  # 조회수 대비 적극시청자 API
                             result['active_num'] = active_info.active_proportion
                             return JsonResponse(result, status=200)
                         else:
-                            return Response({'message': 'ActiveInfo Not Found'}, status=404)
+                            return Response({'message': 'ActiveInfo Not Found'}, status=400)
                     sleep(1)
 
             else:
-                return Response({'message': 'CODE_ERROR'}, status=404)
+                return Response({'message': 'CODE_ERROR'}, status=401)
 
-        except HttpError:  # 유튜브 링크 에러
-            return Response({'message': 'URL_ERROR'}, status=404)
         except KeyError:
-            return Response({'message': 'key wrong'}, status=402)
+            return Response({'message': 'KEY WRONG'}, status=402)
         except TypeError:
-            return Response({'message': 'type wrong'}, status=403)
-        except ValidationError:
-            return Response({'message': 'VALIDATION_ERROR'}, status=404)
+            return Response({'message': 'TYPE WRONG'}, status=403)
         except: # 예상치 못한 에러
             return Response({'message': 'ERROR'}, status=404)
 
@@ -193,8 +207,12 @@ class TopWordAnalysisView(APIView):  # 단어 분석 API
 
     @swagger_auto_schema(
         manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
-            400: 'this is a test description.',
-            500: 'this is a test description.'})
+            400: 'WordCloud Not Found(워드클라우드 정보가 없을 경우)',
+            401: 'CODE ERROR(요청식별코드가 잘못되었을 경우)',
+            402: 'KEY WRONG',
+            403: 'TYPE WRONG',
+            404: 'ERROR(예상치 못한 에러)',
+            500: 'SERVER ERROR'})
     def get(self, request):
         """
         단어 분석 API
@@ -226,31 +244,30 @@ class TopWordAnalysisView(APIView):  # 단어 분석 API
                             result['prefer_list'] = serializer.data
                             return JsonResponse(result, status=200)
                         else:
-                            return Response({'message': 'WordCloud Not Found'}, status=404)
+                            return Response({'message': 'WordCloud Not Found'}, status=400)
                     sleep(1)
 
             else:
-                return Response({'message': 'CODE_ERROR'}, status=404)
+                return Response({'message': 'CODE_ERROR'}, status=401)
 
-        except HttpError:  # 유튜브 링크 에러
-            return Response({'message': 'URL_ERROR'}, status=404)
         except KeyError:
-            return Response({'message': 'key wrong'}, status=402)
+            return Response({'message': 'KEY WRONG'}, status=402)
         except TypeError:
-            return Response({'message': 'type wrong'}, status=403)
-        except ValidationError:
-            return Response({'message': 'VALIDATION_ERROR'}, status=404)
+            return Response({'message': 'TYPE WRONG'}, status=403)
         except: # 예상치 못한 에러
             return Response({'message': 'ERROR'}, status=404)
 
 
 @permission_classes([AllowAny])
 class WordAnalysisView(APIView):  # 단어 분석 API
-
     @swagger_auto_schema(
         manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
-            400: 'this is a test description.',
-            500: 'this is a test description.'})
+            400: 'WordCloud Not Found(워드클라우드 정보가 없을 경우)',
+            401: 'CODE ERROR(요청식별코드가 잘못되었을 경우)',
+            402: 'KEY WRONG',
+            403: 'TYPE WRONG',
+            404: 'ERROR(예상치 못한 에러)',
+            500: 'SERVER ERROR'})
     def get(self, request):
         """
         단어 분석 API
@@ -280,20 +297,16 @@ class WordAnalysisView(APIView):  # 단어 분석 API
                             result['prefer_list'] = serializer.data
                             return JsonResponse(result, status=200)
                         else:
-                            return Response({'message': 'WordCloud Not Found'}, status=404)
+                            return Response({'message': 'WordCloud Not Found'}, status=400)
                     sleep(1)
 
             else:
-                return Response({'message': 'CODE_ERROR'}, status=404)
+                return Response({'message': 'CODE_ERROR'}, status=401)
 
-        except HttpError:  # 유튜브 링크 에러
-            return Response({'message': 'URL_ERROR'}, status=404)
         except KeyError:
-            return Response({'message': 'key wrong'}, status=402)
+            return Response({'message': 'KEY WRONG'}, status=402)
         except TypeError:
-            return Response({'message': 'type wrong'}, status=403)
-        except ValidationError:
-            return Response({'message': 'VALIDATION_ERROR'}, status=404)
+            return Response({'message': 'TYPE WRONG'}, status=403)
         except: # 예상치 못한 에러
             return Response({'message': 'ERROR'}, status=404)
 
@@ -301,8 +314,11 @@ class WordAnalysisView(APIView):  # 단어 분석 API
 class CommentAnalysisView(APIView):  # 단어별 댓글 분석 API
     @swagger_auto_schema(
         manual_parameters=[openapi.Parameter('prefer_idx', openapi.IN_QUERY, description="int", type=openapi.TYPE_INTEGER)],  responses={  # can use schema or text
-            400: 'this is a test description.',
-            500: 'this is a test description.'})
+            401: 'PREFER_IDX_ERROR(prefer_idx가 잘못되거나 분석이 끝나지 않은 경우)',
+            402: 'KEY WRONG',
+            403: 'TYPE WRONG',
+            404: 'ERROR(예상치 못한 에러)',
+            500: 'SERVER ERROR'})
     def get(self, request):
         """
         단어별 댓글 분석 API
@@ -331,16 +347,11 @@ class CommentAnalysisView(APIView):  # 단어별 댓글 분석 API
                 return JsonResponse(result, status=200)
     
             else:
-                return Response({'message': 'PREFER_IDX_ERROR'}, status=404)
+                return Response({'message': 'PREFER_IDX_ERROR'}, status=401)
                    
-
-        except HttpError:  # 유튜브 링크 에러
-            return Response({'message': 'URL_ERROR'}, status=404)
         except KeyError:
-            return Response({'message': 'key wrong'}, status=402)
+            return Response({'message': 'KEY WRONG'}, status=402)
         except TypeError:
-            return Response({'message': 'type wrong'}, status=403)
-        except ValidationError:
-            return Response({'message': 'VALIDATION_ERROR'}, status=404)
+            return Response({'message': 'TYPE WRONG'}, status=403)
         except: # 예상치 못한 에러
             return Response({'message': 'ERROR'}, status=404)

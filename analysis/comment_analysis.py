@@ -177,7 +177,6 @@ def elsecommentAnalysis(word_dict, word_analysis, comment_info_list): # top 4 ì 
     
     dict_len = len(word_analysis)
     else_analysis_result = dict(itertools.islice(word_analysis.items(), 4 , dict_len) )
-    print(else_analysis_result)
     return else_analysis_result
 
 

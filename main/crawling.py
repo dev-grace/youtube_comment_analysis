@@ -6,6 +6,7 @@ def crawling():
     video_info = list()
     api_obj = build('youtube', 'v3', developerKey=api_key)
 
+
     random_id_list = ['mkRg_Yen9Wk','mY_3qwCd2gY', '95stSAizysE', 'xR2bheVpvaA', 'Kz8v7P1FAWM', 'MTscc8CfcZQ','fYncvJJfo-s', 'slSoLG18-gc', '7PGMNM9wKrA', 'DtFhWbWObC8'] # 임의 영상 리스트(일상(브이로그), 반려동물, 경제, 연예, 예능, 먹방, 자연, 음악, 예술, 스포츠)
 
     for random_id in random_id_list:
