@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django_crontab',
     'drf_yasg',
     'rest_framework',
+    'corsheaders',
     'konlpy',
     'main',
     'channel',
@@ -55,6 +56,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware'
 ]
 
 ROOT_URLCONF = 'youtube_comment_analysis.urls'
@@ -128,6 +130,9 @@ STATIC_URL = '/static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_CREDENTIALS = True
 
 CRONJOBS = [
     ('0 0 * * *', 'mazzi.cron.user_analysis', '>> /home/youtube_comment_analysis/user_analysis.log'),
