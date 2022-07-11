@@ -15,6 +15,9 @@ from django.http import JsonResponse
 import threading
 from time import sleep
 
+
+# 개선 방안
+# 임의 쿼리날릴 수 있는 api 생성( 프로그래스 바 생성)/ db 데이터 기반 진행상황 체크/db 접근제한
 @permission_classes([AllowAny])
 class Test(APIView):  # 수정 테스트 API
     @swagger_auto_schema(

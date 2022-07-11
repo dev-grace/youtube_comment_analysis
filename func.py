@@ -8,10 +8,12 @@ from analysis.video_info import videoInfo
 from analysis.models import ActiveInfo, WordCloud, WordAnalysis, CommentAnalysis
 import time
 
-
+# 개선방안
+# 디테일한 로그 기록
 def dataCheck(data): #프론트에서 넘어오는 데이터 log 확인
     logger = logging.getLogger('django')
     logger.info(str(data))
+
 
 def get_client_ip(request): # 클라이언트 ip 확인
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
