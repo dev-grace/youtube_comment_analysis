@@ -205,6 +205,113 @@ class ActiveInfoView(APIView):  # 조회수 대비 적극시청자 API
         except: # 예상치 못한 에러
             return Response({'message': 'ERROR'}, status=404)
 
+
+class MetaInfoView(APIView):  # 영상 조회수/댓글 반환 API
+    @swagger_auto_schema(
+        manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
+            400: 'MetaInfo Not Found(영상 메타 정보가 없을 경우)',
+            401: 'CODE ERROR(요청식별코드가 잘못되었을 경우)',
+            402: 'KEY WRONG',
+            403: 'TYPE WRONG',
+            404: 'ERROR(예상치 못한 에러)',
+            500: 'SERVER ERROR'})
+    def get(self, request):
+        """
+        영상 조회수/댓글 반환 API
+        ---
+        # 내용
+            code: 요청식별코드
+        # 반환
+            view_cnt : 댓글 수
+            cmt_cnt : 조회 수
+        """
+        try:
+            data = request.GET.dict()
+            dataCheck(data)
+            code = data['code']
+            result = {}
+            result['code'] = code
+
+            if UserLog.objects.filter(code=code).exists():
+                user_log = UserLog.objects.get(code=code)
+               
+                while True:
+                    request_status = RequestStatus.objects.get(user_log_idx= user_log.user_log_idx)
+                    if request_status.active_info_status:
+                        if ActiveInfo.objects.filter(user_log_idx= user_log.user_log_idx):
+                            active_info = ActiveInfo.objects.get(user_log_idx= user_log.user_log_idx)
+                            result['view_cnt'] = active_info.view_count
+                            result['cmt_cnt'] = active_info.comment_count
+
+                            return JsonResponse(result, status=200)
+                        else:
+                            return Response({'message': 'MetaInfo Not Found'}, status=400)
+                    sleep(1)
+
+            else:
+                return Response({'message': 'CODE_ERROR'}, status=401)
+
+        except KeyError:
+            return Response({'message': 'KEY WRONG'}, status=402)
+        except TypeError:
+            return Response({'message': 'TYPE WRONG'}, status=403)
+        except: # 예상치 못한 에러
+            return Response({'message': 'ERROR'}, status=404)
+
+
+class AnalysisTimeView(APIView):  # 영상 분석 소요시간 반환 API
+    @swagger_auto_schema(
+        manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
+            400: 'WordCloud Not Found(워드클라우드 정보가 없을 경우)',
+            401: 'CODE ERROR(요청식별코드가 잘못되었을 경우)',
+            402: 'KEY WRONG',
+            403: 'TYPE WRONG',
+            404: 'ERROR(예상치 못한 에러)',
+            500: 'SERVER ERROR'})
+    def get(self, request):
+        """
+        영상 분석 예상 소요시간 반환 API
+        ---
+        # 내용
+            code: 요청식별코드
+        # 반환
+            analysis_time : 영상 분석 예상 소요시간(정수 값)
+        """
+        try:
+            data = request.GET.dict()
+            dataCheck(data)
+            code = data['code']
+
+            result = {}
+            result['code'] = code
+
+
+            if UserLog.objects.filter(code=code).exists():
+                user_log = UserLog.objects.get(code=code)
+                while True:
+                    request_status = RequestStatus.objects.get(user_log_idx= user_log.user_log_idx)
+                    if request_status.word_cloud_status:
+                        if WordCloud.objects.filter(user_log_idx=user_log.user_log_idx).exists():
+                            word_cloud_list = WordCloud.objects.filter(user_log_idx=user_log.user_log_idx)
+                            word_analysis_list_count = CommentAnalysis.objects.filter(word_cloud_idx__in= word_cloud_list).count()
+                            result['analysis_time'] = round(word_analysis_list_count * 0.05)
+                            return JsonResponse(result, status=200)
+                        else:
+                            return Response({'message': 'WordCloud Not Found'}, status=400)
+                    sleep(1)
+
+            else:
+                return Response({'message': 'CODE_ERROR'}, status=401)
+
+        except KeyError:
+            return Response({'message': 'KEY WRONG'}, status=402)
+        except TypeError:
+            return Response({'message': 'TYPE WRONG'}, status=403)
+        except: # 예상치 못한 에러
+            return Response({'message': 'ERROR'}, status=404)
+
+
+
 @permission_classes([AllowAny])
 class TopWordAnalysisView(APIView):  # 단어 분석 API
 
