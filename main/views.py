@@ -90,39 +90,38 @@ class ModelTest(APIView): # 합의 API
         try:
             import tensorflow as tf
             import torch
-            from transformers import DistilBertForSequenceClassification
-            model_path = './saved_model/model.pb'
-            model = DistilBertForSequenceClassification.from_pretrained('./analysis/model')
-            # print(model)
-            saved_model = torch.save(model.state_dict(), model_path)
-            
-            model = torch.load('./saved_model/model.pb')
-            # print(model)
+            from transformers import TFDistilBertForSequenceClassification
+            model_path = './analysis/saved_model'
+            model = TFDistilBertForSequenceClassification.from_pretrained('./analysis/model', from_pt = True)
 
-            # tf.saved_model.save(model.state_dict(), model_path)
-            # model = tf.keras.models.load_model('D:/Users/qkrdm/treering/youtube_comment_analysis/saved_model')
-            # print(model)
-            # model.save('model.h5')
-            # 파일로 저장되어 있는 모델을 load 한 뒤, TFLite 모델로 변환
-            # model = DistilBertForSequenceClassification.from_pretrained('./analysis/model')
-            # print(model)
+    
 
-            # 변수로 저장되어 있는 모델을, TFLite 모델로 변환
-            # model_path = 'D:/Users/qkrdm/treering/youtube_comment_analysis/analysis/model'
-            # print('시작')
-            converter = tf.lite.TFLiteConverter.from_saved_model(model)
-            # print('끝')
+            # torch.save(model, model_path)    
+            # saved_model = torch.load(model_path)
+
+            tf.saved_model.save(model, model_path)
+            # loaded = tf.saved_model.load("./saved_model")
+            # loaded.eval()
+
+
+            converter = tf.lite.TFLiteConverter.from_saved_model(model_path) # path to the SavedModel directory
 
             # FP16 양자화 설정
-            # converter.target_spec.supported_types = [tf.float16]
-            # converter.optimizations = [tf.lite.Optimize.DEFAULT]
+            converter.target_spec.supported_types = [tf.float16]
+            converter.optimizations = [tf.lite.Optimize.DEFAULT]
+
+            # 컨버터 설정
+            converter.experimental_new_converter = True
+            converter.optimizations = [tf.lite.Optimize.DEFAULT]
+            converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]
+            converter.allow_custom_ops=True
 
             # 모델 양자화
             tflite_model = converter.convert()
+            
 
-            # 변환된 모델을 .tflite 파일에 저장
-            open("distilkobert.tflite", "wb").write(tflite_model)
-
+            # Save the model.
+            open("./analysis/saved_model/saved_model.tflite", "wb").write(tflite_model)
 
             return Response({'message': 'SUCCESS'}, status=200)
         except HttpError as e:   #유튜브 에러

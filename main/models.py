@@ -1,4 +1,3 @@
-from re import L
 from django.db import models
 
 
