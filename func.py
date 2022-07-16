@@ -6,7 +6,32 @@ from analysis.comment_analysis import commentAnalysis, topcommentAnalysis, elsec
 from analysis.word_cloud import wordDict
 from analysis.video_info import videoInfo
 from analysis.models import ActiveInfo, WordCloud, WordAnalysis, CommentAnalysis
+import threading
 import time
+import ctypes
+
+
+class StoppableThread(threading.Thread):
+    """Thread class with a stop() method. The thread itself has to check
+    regularly for the stopped() condition."""
+
+    def __init__(self,  *args, **kwargs):
+        super(StoppableThread, self).__init__(*args, **kwargs)
+        self._stop_event = threading.Event()
+
+    def stop(self):
+        self._stop_event.set()
+
+    def stopped(self):
+        return self._stop_event.is_set()
+
+    def stop_thread(self):
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_ulong(self.ident),
+                                                         ctypes.py_object(SystemExit))
+        if res > 1:
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_ulong(self.ident), 0)
+
+
 
 # 개선방안
 # 디테일한 로그 기록
@@ -62,36 +87,38 @@ def defalut_func(video_id, userlog):
 
 
 def background_func(userlog, request_status, comment_detail_list):
-    #워드 클라우드
-    word_dict, comment_info_list = wordDict(
-        comment_detail_list)  # 워드 클라우드 포함되는 문장
+    try:
+        #워드 클라우드
+        word_dict, comment_info_list = wordDict(
+            comment_detail_list)  # 워드 클라우드 포함되는 문장
 
-    word_colut_list = [WordCloud(
-        user_log_idx=userlog, word=word, weight=weight) for word, weight in word_dict.items()]
-    WordCloud.objects.bulk_create(word_colut_list)
-    request_status.word_cloud_status = True
-    request_status.save()
-
-    
-    if len(word_dict)>= 4:
-        # top 4 문장 분석
-        word_analysis, top_result, else_comment_info_list = topcommentAnalysis(word_dict, comment_info_list)
-        comment_analysis_func(userlog, top_result)
-
-        request_status.top_word_analysis_status = True
+        word_colut_list = [WordCloud(
+            user_log_idx=userlog, word=word, weight=weight) for word, weight in word_dict.items()]
+        WordCloud.objects.bulk_create(word_colut_list)
+        request_status.word_cloud_status = True
         request_status.save()
 
-        # 이외 문장 분석
-        else_analysis_result = elsecommentAnalysis(word_dict, word_analysis, else_comment_info_list)
-        comment_analysis_func(userlog, else_analysis_result)
-    else:
-        analysis_result = commentAnalysis(word_dict, comment_info_list)
-        comment_analysis_func(userlog, analysis_result['word_analysis'])
+        
+        if len(word_dict)>= 4:
+            # top 4 문장 분석
+            word_analysis, top_result, else_comment_info_list = topcommentAnalysis(word_dict, comment_info_list)
+            comment_analysis_func(userlog, top_result)
+
+            request_status.top_word_analysis_status = True
+            request_status.save()
+
+            # 이외 문장 분석
+            else_analysis_result = elsecommentAnalysis(word_dict, word_analysis, else_comment_info_list)
+            comment_analysis_func(userlog, else_analysis_result)
+        else:
+            analysis_result = commentAnalysis(word_dict, comment_info_list)
+            comment_analysis_func(userlog, analysis_result['word_analysis'])
 
 
-    request_status.word_analysis_status = True
-    request_status.save()
-
+        request_status.word_analysis_status = True
+        request_status.save()
+    except Exception as e:
+        print('분석 중도 중지', e)
 
 def comment_analysis_func(userlog, analysis_result):
 

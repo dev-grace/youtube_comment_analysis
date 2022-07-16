@@ -6,13 +6,12 @@ from analysis.models import WordCloud, ActiveInfo, WordAnalysis, CommentAnalysis
 from analysis.serializers import WordCloudSerializer, WordAnalysisSerializer, CommentAnalysisSerializer
 from main.models import UserLog, RequestStatus
 import secrets
-from func import dataCheck, get_client_ip, get_video_url, ip_count, test_check_func, defalut_func, background_func
+from func import StoppableThread, dataCheck, get_client_ip, get_video_url, ip_count, test_check_func, defalut_func, background_func
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.decorators import permission_classes
 from rest_framework.permissions import AllowAny
 from django.http import JsonResponse
-import threading
 from time import sleep
 
 
@@ -90,8 +89,13 @@ class YoutubeUrl(APIView):  # 수정 테스트 API
             if comment_count < 50:
                 return Response({'message': 'ANALYSIS FAIL'}, status=400)
             else:
-                thread = threading.Thread(target = background_func, args = (userlog, request_status, comment_detail_list))
+                thread = StoppableThread(target = background_func, name = f'daemon {code}', args = (userlog, request_status, comment_detail_list))
+                thread.setDaemon(True)
                 thread.start()
+
+                ident = thread.ident
+                userlog.thread_ident = ident
+                userlog.save()
                     
                 result = {'code': code}
 
@@ -113,6 +117,7 @@ class YoutubeUrl(APIView):  # 수정 테스트 API
 class WordCloudView(APIView):  # 워드 클라우드 API
     @swagger_auto_schema(
         manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
+            400: 'analysis stopped(분석을 멈춘 경우)',
             401: 'CODE ERROR(code(요청식별코드)가 잘못되었을 경우)',
             402: 'KEY WRONG',
             403: 'TYPE WRONG',
@@ -143,6 +148,10 @@ class WordCloudView(APIView):  # 워드 클라우드 API
                         serializer = WordCloudSerializer(word_cloud_list, many=True)
                         result['data'] = serializer.data
                         return JsonResponse(result, status=200)
+                    
+                    elif user_log.stop_analysis: # 분석을 멈춘 경우
+                        return JsonResponse({'message': 'analysis stopped'}, status=400)
+
                     sleep(1)
 
             else:
@@ -159,6 +168,7 @@ class WordCloudView(APIView):  # 워드 클라우드 API
 class ActiveInfoView(APIView):  # 조회수 대비 적극시청자 API
     @swagger_auto_schema(
         manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
+            400: 'analysis stopped(분석을 멈춘 경우)',
             400: 'ActiveInfo Not Found(적극 시청자 정보가 없을 경우)',
             401: 'CODE ERROR(요청식별코드가 잘못되었을 경우)',
             402: 'KEY WRONG',
@@ -193,6 +203,10 @@ class ActiveInfoView(APIView):  # 조회수 대비 적극시청자 API
                             return JsonResponse(result, status=200)
                         else:
                             return Response({'message': 'ActiveInfo Not Found'}, status=400)
+                    
+                    elif user_log.stop_analysis: # 분석을 멈춘 경우
+                        return JsonResponse({'message': 'analysis stopped'}, status=400)
+                    
                     sleep(1)
 
             else:
@@ -209,6 +223,7 @@ class ActiveInfoView(APIView):  # 조회수 대비 적극시청자 API
 class MetaInfoView(APIView):  # 영상 조회수/댓글 반환 API
     @swagger_auto_schema(
         manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
+            400: 'analysis stopped(분석을 멈춘 경우)',
             400: 'MetaInfo Not Found(영상 메타 정보가 없을 경우)',
             401: 'CODE ERROR(요청식별코드가 잘못되었을 경우)',
             402: 'KEY WRONG',
@@ -246,6 +261,10 @@ class MetaInfoView(APIView):  # 영상 조회수/댓글 반환 API
                             return JsonResponse(result, status=200)
                         else:
                             return Response({'message': 'MetaInfo Not Found'}, status=400)
+                    
+                    elif user_log.stop_analysis: # 분석을 멈춘 경우
+                        return JsonResponse({'message': 'analysis stopped'}, status=400)
+                    
                     sleep(1)
 
             else:
@@ -262,6 +281,7 @@ class MetaInfoView(APIView):  # 영상 조회수/댓글 반환 API
 class AnalysisTimeView(APIView):  # 영상 분석 소요시간 반환 API
     @swagger_auto_schema(
         manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
+            400: 'analysis stopped(분석을 멈춘 경우)',
             400: 'WordCloud Not Found(워드클라우드 정보가 없을 경우)',
             401: 'CODE ERROR(요청식별코드가 잘못되었을 경우)',
             402: 'KEY WRONG',
@@ -298,6 +318,10 @@ class AnalysisTimeView(APIView):  # 영상 분석 소요시간 반환 API
                             return JsonResponse(result, status=200)
                         else:
                             return Response({'message': 'WordCloud Not Found'}, status=400)
+                    
+                    elif user_log.stop_analysis: # 분석을 멈춘 경우
+                        return JsonResponse({'message': 'analysis stopped'}, status=400)
+                    
                     sleep(1)
 
             else:
@@ -314,9 +338,9 @@ class AnalysisTimeView(APIView):  # 영상 분석 소요시간 반환 API
 
 @permission_classes([AllowAny])
 class TopWordAnalysisView(APIView):  # 단어 분석 API
-
     @swagger_auto_schema(
         manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
+            400: 'analysis stopped(분석을 멈춘 경우)',
             400: 'WordCloud Not Found(워드클라우드 정보가 없을 경우)',
             401: 'CODE ERROR(요청식별코드가 잘못되었을 경우)',
             402: 'KEY WRONG',
@@ -355,6 +379,10 @@ class TopWordAnalysisView(APIView):  # 단어 분석 API
                             return JsonResponse(result, status=200)
                         else:
                             return Response({'message': 'WordCloud Not Found'}, status=400)
+                    
+                    elif user_log.stop_analysis: # 분석을 멈춘 경우
+                        return JsonResponse({'message': 'analysis stopped'}, status=400)
+                    
                     sleep(1)
 
             else:
@@ -372,6 +400,7 @@ class TopWordAnalysisView(APIView):  # 단어 분석 API
 class WordAnalysisView(APIView):  # 단어 분석 API
     @swagger_auto_schema(
         manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
+            400: 'analysis stopped(분석을 멈춘 경우)',
             400: 'WordCloud Not Found(워드클라우드 정보가 없을 경우)',
             401: 'CODE ERROR(요청식별코드가 잘못되었을 경우)',
             402: 'KEY WRONG',
@@ -408,6 +437,10 @@ class WordAnalysisView(APIView):  # 단어 분석 API
                             return JsonResponse(result, status=200)
                         else:
                             return Response({'message': 'WordCloud Not Found'}, status=400)
+                    
+                    elif user_log.stop_analysis: # 분석을 멈춘 경우
+                        return JsonResponse({'message': 'analysis stopped'}, status=400)
+                    
                     sleep(1)
 
             else:

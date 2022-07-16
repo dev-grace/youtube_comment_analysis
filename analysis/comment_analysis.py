@@ -5,18 +5,20 @@ from transformers import DistilBertForSequenceClassification
 from analysis.tokenization_kobert import KoBertTokenizer
 from keras.preprocessing.sequence import pad_sequences
 import multiprocessing
+import parmap
 import itertools
 
 # 모델 설정
 device = torch.device('cpu') # gpu -> core gpu server -> ec2 gpu
-model = DistilBertForSequenceClassification.from_pretrained('./analysis/model')
+model = DistilBertForSequenceClassification.from_pretrained('./analysis/model').eval() # 평가모드
 tokenizer =  KoBertTokenizer.from_pretrained('monologg/kobert', do_lower_case=False)
 
+# 멀티 프로세싱
+num_cores = multiprocessing.cpu_count()
 
 def analysis_func(comment_info):
     sentence_list = comment_info['sentence']
     sentence_positive_list = comment_info['sentence_positive']
-
     for sentence in sentence_list:
         logits = test_sentences([sentence])
         positive = int(np.argmax(logits))
@@ -27,9 +29,6 @@ def analysis_func(comment_info):
 
 
 def commentAnalysis(word_dict, comment_info_list): # 원본
-    # 평가모드로 변경
-    global model
-    model.eval()
 
     word_analysis = {}
     set_word_list = word_dict.keys()
@@ -43,10 +42,7 @@ def commentAnalysis(word_dict, comment_info_list): # 원본
             }
             
     # 멀티 프로세싱
-    pool = multiprocessing.Pool(processes= 2)
-    sentence_positive_list = list(pool.map(analysis_func, comment_info_list))
-    pool.close()
-    pool.join()
+    sentence_positive_list = parmap.map(analysis_func, comment_info_list, pm_pbar=True, pm_processes=num_cores)
 
     for sentence_positive in sentence_positive_list:
         sentence_list = sentence_positive['sentence_positive']
@@ -80,9 +76,6 @@ def commentAnalysis(word_dict, comment_info_list): # 원본
 
 
 def topcommentAnalysis(word_dict, comment_info_list): # top 4분석
-    # 평가모드로 변경
-    global model
-    model.eval()
 
     word_analysis = {}
     set_word_list = word_dict.keys()
@@ -103,12 +96,10 @@ def topcommentAnalysis(word_dict, comment_info_list): # top 4분석
             top_comment_info_list.append(comment_info)
         else:
             else_comment_info_list.append(comment_info)
-            
+    
+
     # 멀티 프로세싱
-    pool = multiprocessing.Pool(processes= 2)
-    sentence_positive_list = list(pool.map(analysis_func, top_comment_info_list))
-    pool.close()
-    pool.join()
+    sentence_positive_list = list(parmap.map(analysis_func, top_comment_info_list, pm_pbar=True, pm_processes=num_cores))
 
     for sentence_positive in sentence_positive_list:
         sentence_list = sentence_positive['sentence_positive']
@@ -140,15 +131,9 @@ def topcommentAnalysis(word_dict, comment_info_list): # top 4분석
 
 
 def elsecommentAnalysis(word_dict, word_analysis, comment_info_list): # top 4 제외 분석
-    # 평가모드로 변경
-    global model
-    model.eval()
             
     # 멀티 프로세싱
-    pool = multiprocessing.Pool(processes= 2)
-    sentence_positive_list = list(pool.map(analysis_func, comment_info_list))
-    pool.close()
-    pool.join()
+    sentence_positive_list = parmap.map(analysis_func, comment_info_list, pm_pbar=True, pm_processes=num_cores)
 
     for sentence_positive in sentence_positive_list:
         sentence_list = sentence_positive['sentence_positive']

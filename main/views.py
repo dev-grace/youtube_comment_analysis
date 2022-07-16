@@ -2,10 +2,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.core.exceptions import ValidationError
 from googleapiclient.errors import HttpError
-import json
+from main.models import UserLog
 from rest_framework.decorators import permission_classes
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework.permissions import AllowAny
+from drf_yasg import openapi
+from func import dataCheck
 from main.crawling import crawling
+import threading
 
 @permission_classes([AllowAny])
 class Crawling(APIView): # 합의 API
@@ -24,6 +28,61 @@ class Crawling(APIView): # 합의 API
             return Response({'message': 'TYPE WRONG'}, status=403)
         except ValidationError:
             return Response({'message': 'VALIDATION_ERROR'}, status=404)
+
+
+class AnalysisStop(APIView):  # 분석 중지 요청 API
+    @swagger_auto_schema(
+        manual_parameters=[openapi.Parameter('code', openapi.IN_QUERY, description="string", type=openapi.TYPE_STRING)],  responses={  # can use schema or text
+            400: 'Analysis already stopped(이미 분석 정지 요청을 받은 경우)',
+            401: 'CODE ERROR(요청식별코드가 잘못되었을 경우)',
+            402: 'KEY WRONG',
+            403: 'TYPE WRONG',
+            404: 'ERROR(예상치 못한 에러)',
+            500: 'SERVER ERROR'})
+    def get(self, request):
+        """
+        분석 중지 요청 API
+        ---
+        # 내용
+            code: 요청식별코드
+        # 반환
+            active_num : 적극 시청자 비율(float)
+        """
+        try:
+            data = request.GET.dict()
+            dataCheck(data)
+            code = data['code']
+            result = {}
+            result['code'] = code
+
+            if UserLog.objects.filter(code=code).exists():
+                user_log = UserLog.objects.get(code=code)
+                if user_log.stop_analysis:
+                    return Response({'message': 'Analysis already stopped'}, status=400)
+                else:
+
+                    ident = user_log.thread_ident
+                    thread = threading._active.get(ident)
+                    if thread:
+                        thread.stop_thread()
+                        thread.join()
+
+                    user_log.stop_analysis = True
+                    user_log.save()
+                        
+                    return Response({'message': 'SUCCESS'}, status=200)
+
+            else:
+                return Response({'message': 'CODE_ERROR'}, status=401)
+
+        except KeyError:
+            return Response({'message': 'KEY WRONG'}, status=402)
+        except TypeError:
+            return Response({'message': 'TYPE WRONG'}, status=403)
+        except: # 예상치 못한 에러
+            return Response({'message': 'ERROR'}, status=404)
+
+
 
 @permission_classes([AllowAny])
 class ModelTest(APIView): # 합의 API
