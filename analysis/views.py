@@ -92,7 +92,6 @@ class YoutubeUrl(APIView):  # 수정 테스트 API
                 thread = StoppableThread(target = background_func, name = f'daemon {code}', args = (userlog, request_status, comment_detail_list))
                 thread.setDaemon(True)
                 thread.start()
-
                 ident = thread.ident
                 userlog.thread_ident = ident
                 userlog.save()

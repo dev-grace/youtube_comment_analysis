@@ -45,8 +45,6 @@ class AnalysisStop(APIView):  # 분석 중지 요청 API
         ---
         # 내용
             code: 요청식별코드
-        # 반환
-            active_num : 적극 시청자 비율(float)
         """
         try:
             data = request.GET.dict()
@@ -61,11 +59,13 @@ class AnalysisStop(APIView):  # 분석 중지 요청 API
                     return Response({'message': 'Analysis already stopped'}, status=400)
                 else:
 
-                    ident = user_log.thread_ident
+                    ident = int(user_log.thread_ident)
                     thread = threading._active.get(ident)
+                    thread_name = thread.name
                     if thread:
-                        thread.stop_thread()
-                        thread.join()
+                        if thread.name == f'daemon {code}':
+                            thread.stop_thread()
+                            thread.join()
 
                     user_log.stop_analysis = True
                     user_log.save()

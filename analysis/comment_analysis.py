@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-import tensorflow as tf
 from transformers import DistilBertForSequenceClassification
 from analysis.tokenization_kobert import KoBertTokenizer
 from keras.preprocessing.sequence import pad_sequences

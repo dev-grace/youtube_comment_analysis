@@ -10,7 +10,7 @@ class UserLog(models.Model):
     target_url = models.CharField(max_length=300)  # 요청 유튜브 url
     youtube_id = models.CharField(max_length=30,
                                   null=True)  # 요청 유튜브 id
-    thread_ident = models.IntegerField(default=0) # 백그라운드 스레드 id
+    thread_ident = models.CharField(max_length=30, null = True) # 백그라운드 스레드 id
     stop_analysis = models.BooleanField(default = False) # 사용자 이탈 시 플래그
     date = models.DateTimeField(auto_now_add=True)  # 요청일시
 
